@@ -1,0 +1,16 @@
+Naufal Firdaus
+Firmware & IoT Engineer with AI focus. Built RAG demos and small LLM apps in Python.
+
+Skills:
+Python, LangChain, PyTorch, SQLite, Docker, Redis, Postgres, Streamlit, FAISS
+
+Experience:
+- Built nutrition chatbot (RAG) with embeddings, vector DB, retrieval.
+- CVScanAI: resume parser + reviewer using LLM.
+
+Projects:
+- IoT battery monitor with smoothing filter on STM32/ESP32.
+- Mini RAG with chunking and rerank.
+
+Education:
+M.Comp Sci (AI) candidate

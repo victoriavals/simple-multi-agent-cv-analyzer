@@ -1,0 +1,87 @@
+# --- Python bytecode / builds
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.build/
+build/
+dist/
+pip-wheel-metadata/
+.eggs/
+*.egg-info/
+__pypackages__/
+.python-version
+
+# --- Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# --- Logs / runtime junk
+logs/
+*.log
+*.tmp
+*.bak
+*.swp
+*.swo
+.cache/
+
+# --- Test/typing/linters
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+.pytest_cache/
+.mypy_cache/
+.dmypy.json
+.pyre/
+.pytype/
+.ruff_cache/
+
+# --- IDE/editor
+.vscode/
+.idea/
+*.code-workspace
+*.iml
+*.sublime-*
+
+# --- OS cruft
+.DS_Store
+Thumbs.db
+
+# --- Streamlit
+.streamlit/secrets.toml
+.streamlit/config.toml
+
+# --- Environment files (keep secrets out of git)
+.env
+.env.*
+*.env
+*.env.*
+
+# --- App artifacts and scratch
+tmp/
+temp/
+**/tmp/
+**/temp/
+artifacts/
+outputs/
+reports/
+# Keep sample assets tracked
+!samples/**
+!samples/cv.pdf
+!samples/sample_cv.txt
+
+# --- PDF/Docs handling
+# Do NOT ignore all PDFs globally; only ignore generated ones under outputs/reports.
+# If you add other output folders later, add them above instead of a global *.pdf rule.
+
+# --- Jupyter (if any appear)
+.ipynb_checkpoints/
+
+# --- Node leftovers (just in case)
+node_modules/
+
+# END

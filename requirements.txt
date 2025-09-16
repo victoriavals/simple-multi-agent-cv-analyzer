@@ -1,0 +1,10 @@
+streamlit
+langchain>=0.2.14
+langgraph>=0.2.26
+langchain-google-genai>=1.0.6
+langchain-mistralai>=0.1.12
+langchain-community>=0.2.10
+pydantic>=2.7.0
+python-dotenv>=1.0.1
+pypdf>=4.2.0
+tavily-python>=0.3.6
