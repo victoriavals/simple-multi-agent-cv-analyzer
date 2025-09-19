@@ -14,6 +14,7 @@ if str(BASE_DIR) not in sys.path:
 from src.state import PipelineState
 from src.graph.workflow import build_graph
 from src.llm_provider import normalize_provider
+from src.agents.report_agent import validate_markdown
 from dotenv import load_dotenv
 
 
@@ -32,10 +33,10 @@ def main():
 
     with st.sidebar:
         role = st.text_input("Target role", placeholder="e.g., Senior AI Engineer")
-        language = st.selectbox("Language", options=["english", "indonesia"], index=0)
+        language = st.selectbox("Language", options=["english", "indonesia"], index=1)
         provider_label = st.selectbox("LLM Provider", options=["Auto", "Gemini", "Mistral"], index=0)
         uploaded = st.file_uploader("Upload CV (.pdf or .txt)", type=["pdf", "txt"], accept_multiple_files=False)
-        demo = st.checkbox("Use sample CV (if no file uploaded)")
+        demo = st.checkbox("Demo mode (use sample CV if no file uploaded)")
         run = st.button("Run analysis")
 
     if run:
@@ -68,7 +69,7 @@ def main():
             st.warning("Please enter a target role.")
             return
         if not uploaded and not demo:
-            st.warning("Please upload a CV file (.pdf or .txt), or enable 'Use sample CV'.")
+            st.warning("Please upload a CV file (.pdf or .txt), or enable 'Demo mode'.")
             return
 
         # Persist to a temp file with the correct suffix
@@ -80,9 +81,9 @@ def main():
                 tmp_path = tmp.name
         else:
             # Use sample
-            sample_path = Path(__file__).parent / "samples" / "cv.pdf"
+            sample_path = Path(__file__).parent / "samples" / "sample_cv.txt"
             if not sample_path.exists():
-                st.error("Sample CV not found at samples/cv.pdf.")
+                st.error("Sample CV not found at samples/sample_cv.txt.")
                 return
             tmp_path = str(sample_path)
 
@@ -110,7 +111,18 @@ def main():
             st.warning("\n".join(final.errors))
 
         if final.report_markdown:
+            # Display the report
             st.markdown(final.report_markdown)
+            
+            # Validate markdown and show issues if any
+            try:
+                issues = validate_markdown(final.report_markdown, language)
+                if issues:
+                    st.info("📋 **Report validation notes:**\n" + "\n".join([f"• {issue}" for issue in issues]))
+            except Exception:
+                pass  # Skip validation if function not available
+            
+            # Download button with exact same content
             fname = f"report-{slugify(role)}-{slugify(language)}.md"
             st.download_button(
                 label="Download as .md",
