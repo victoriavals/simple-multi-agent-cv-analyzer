@@ -73,6 +73,7 @@ reports/
 !samples/**
 !samples/cv.pdf
 !samples/sample_cv.txt
+!samples/sample_output.md
 
 # --- PDF/Docs handling
 # Do NOT ignore all PDFs globally; only ignore generated ones under outputs/reports.
