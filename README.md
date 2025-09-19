@@ -82,7 +82,7 @@ Create a `.env` file in the project root:
 ```env
 # Gemini (Google AI)
 GEMINI_API_KEY=your_gemini_key_here
-GEMINI_MODEL=gemini-1.5-pro
+GEMINI_MODEL=gemini-2.0-flash
 
 # Mistral
 MISTRAL_API_KEY=your_mistral_key_here
