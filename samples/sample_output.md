@@ -1,39 +1,42 @@
 ## Ikhtisar
-Naufal Firdaus
-naufalfirdaus282@gmail.com  •  +62 87838882802  •  Jakarta  •   https://www.linkedin.com/in/naufalfirdauss/
-SUMMARY
-AI and Machine Learning specialist pursuing a Master of Computer Science with a strong foundation in Electrical Engineering.
-Proven track record in developing and optimizing embedded systems. Expertise in Python, C++, and developing AI models
-to solve complex problems. Experienced in the full project lifecycle, from hardware integration on STM32/ESP32 platforms to
-developing AI-driven solutions. Eager to contribute to ParagonCorp as a Data Scientist.
+Insinyur Firmware & IoT dengan fokus pada AI. Memiliki pengalaman membangun demo RAG dan aplikasi LLM kecil menggunakan Python.
 
 ## Kekuatan
 | Skill | Catatan |
 |---|---|
-| - | Belum teridentifikasi |
+| Python | Pengalaman dalam membangun aplikasi LLM dan demo RAG. |
+| Langchain | Digunakan dalam implementasi RAG. |
+| Docker | Mampu melakukan containerization aplikasi. |
+| FAISS | Digunakan untuk pencarian vektor mirip (ANN). |
+| Postgres | Pengalaman dengan database SQL. |
 
 ## Kesenjangan Keahlian
 | Skill | Catatan |
 |---|---|
-| apache spark | prioritas belajar |
-| automated testing | prioritas belajar |
-| ci/cd pipelines | prioritas belajar |
-| computer vision | prioritas belajar |
-| data preprocessing | prioritas belajar |
+| AI Frameworks | Perlu memperdalam pengetahuan tentang kerangka kerja AI utama. |
+| Data Processing | Perlu meningkatkan kemampuan dalam pemrosesan data skala besar. |
+| LLMs | Perlu pemahaman lebih mendalam tentang arsitektur dan pelatihan LLM. |
+| Machine Learning | Perlu memperluas pengetahuan tentang berbagai algoritma machine learning. |
+| Neural Networks | Perlu pemahaman lebih mendalam tentang arsitektur jaringan saraf. |
+| Orchestration Frameworks | Perlu mempelajari kerangka kerja orkestrasi untuk alur kerja AI. |
 
 ## Rencana Upskilling
-**Minggu 1 — Dasar & Instalasi**
-- Pelajari dasar apache spark
-- Ikuti tutorial 1-2 jam apache spark
-- Praktikkan 2-3 latihan apache spark
-**Minggu 2 — Latihan Inti**
-- Pelajari dasar automated testing
-- Ikuti tutorial 1-2 jam automated testing
-- Praktikkan 2-3 latihan automated testing
-**Minggu 3 — Proyek Mini**
-- Pelajari dasar ci/cd pipelines
-- Ikuti tutorial 1-2 jam ci/cd pipelines
-- Praktikkan 2-3 latihan ci/cd pipelines
+**Minggu 1 — Minggu 1: Dasar-Dasar AI**
+- Pelajari dasar-dasar kerangka kerja AI seperti TensorFlow atau PyTorch.
+- Ikuti kursus online tentang machine learning.
+- Eksplorasi arsitektur jaringan saraf dasar.
+**Minggu 2 — Minggu 2: Pemrosesan Data**
+- Pelajari teknik pemrosesan data menggunakan Pandas dan NumPy.
+- Eksplorasi alat pemrosesan data skala besar seperti Spark.
+- Implementasikan pipeline pemrosesan data sederhana.
+**Minggu 3 — Minggu 3: LLM dan Implementasi**
+- Pelajari arsitektur LLM seperti Transformer.
+- Eksperimen dengan fine-tuning LLM yang sudah ada.
+- Bangun aplikasi sederhana menggunakan LLM.
+**Minggu 4 — Minggu 4: Orkestrasi Alur Kerja**
+- Pelajari tentang kerangka kerja orkestrasi seperti Kubeflow atau Airflow.
+- Implementasikan alur kerja machine learning sederhana.
+- Integrasikan alur kerja dengan aplikasi yang ada.
 
 ## Catatan Akhir
-Gunakan rencana belajar untuk menutup kesenjangan utama.
+Fokus pada pengembangan keterampilan dalam kerangka kerja AI, pemrosesan data, dan LLM untuk meningkatkan kemampuan sebagai Senior AI Engineer.
