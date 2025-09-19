@@ -122,7 +122,9 @@ python main.py --cv resume.pdf --role "DevOps Engineer" --language indonesia --p
 
 ### Streamlit Web App
 
-**Start the app:**
+**Live Demo**: Try the app online at https://simple-multi-agent-cv-analyzer.streamlit.app/
+
+**Start locally:**
 ```bash
 streamlit run app.py
 ```
@@ -135,6 +137,8 @@ streamlit run app.py
 - **Demo Mode**: Use included sample CV for testing
 
 The app displays the report on-screen and provides a download button for the exact same content.
+
+- The app displays a small footer at the bottom: `made by Naufal Firdaus for Krenovation Assessment Test`
 
 ## Output Format
 
