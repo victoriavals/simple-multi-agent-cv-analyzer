@@ -25,6 +25,15 @@ def slugify(value: str) -> str:
     return value.lower() or "report"
 
 
+def render_footer() -> None:
+    import streamlit as st
+    st.write("---")
+    st.markdown(
+        "made by **Naufal Firdaus** for **Krenovation Assessment Test** • Live demo: "
+        "[simple-multi-agent-cv-analyzer.streamlit.app](https://simple-multi-agent-cv-analyzer.streamlit.app/)"
+    )
+
+
 def main():
     load_dotenv()
     st.set_page_config(page_title="AI CV Analyzer", page_icon="📄", layout="centered")
@@ -132,6 +141,9 @@ def main():
             )
         else:
             st.error("No report produced.")
+
+    # Footer - always shows at the bottom
+    render_footer()
 
 
 if __name__ == "__main__":
