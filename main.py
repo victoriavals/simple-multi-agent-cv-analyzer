@@ -18,9 +18,15 @@ def main():
     parser.add_argument("--role", required=True, help="Target role, e.g. 'Senior AI Engineer'")
     parser.add_argument("--out", default="report.md", help="Output markdown path")
     parser.add_argument("--provider", default="auto", choices=["auto","gemini","mistral"], help="LLM provider selection")
+    parser.add_argument("--language", default="indonesia", choices=["english","indonesia"], help="Report language")
     args = parser.parse_args()
 
-    state = PipelineState(cv_path=args.cv, target_role=args.role, provider=normalize_provider(args.provider))
+    state = PipelineState(
+        cv_path=args.cv, 
+        target_role=args.role, 
+        language=args.language,
+        provider=normalize_provider(args.provider)
+    )
     run = build_graph()
     final = run(state)
     # LangGraph app.invoke may return a plain dict; coerce into PipelineState for uniform handling
