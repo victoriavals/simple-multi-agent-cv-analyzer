@@ -1,0 +1,32 @@
+{
+  "name": "cv-analyzer-web",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint .",
+    "typecheck": "tsc --noEmit"
+  },
+  "engines": { "node": ">=20.9" },
+  "dependencies": {
+    "@fontsource-variable/manrope": "^5",
+    "@radix-ui/react-tabs": "^1",
+    "lucide-react": "^1",
+    "motion": "^14",
+    "next": "^16",
+    "react": "^19",
+    "react-dom": "^19",
+    "react-markdown": "^10",
+    "remark-gfm": "^4"
+  },
+  "devDependencies": {
+    "@types/node": "^24",
+    "@types/react": "^19",
+    "@types/react-dom": "^19",
+    "eslint": "^9",
+    "eslint-config-next": "^16",
+    "typescript": "^5"
+  }
+}
