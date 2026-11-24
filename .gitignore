@@ -53,31 +53,26 @@ Thumbs.db
 
 # --- Streamlit
 .streamlit/secrets.toml
-.streamlit/config.toml
 
 # --- Environment files (keep secrets out of git)
 .env
 .env.*
 *.env
 *.env.*
+!/.env.example
+!/web/.env.local.example
 
 # --- App artifacts and scratch
 tmp/
 temp/
-**/tmp/
-**/temp/
 artifacts/
 outputs/
 reports/
-# Keep sample assets tracked
-!samples/**
-!samples/cv.pdf
-!samples/sample_cv.txt
-!samples/sample_output.md
+/report.md
+.playwright-mcp/
 
-# --- PDF/Docs handling
-# Do NOT ignore all PDFs globally; only ignore generated ones under outputs/reports.
-# If you add other output folders later, add them above instead of a global *.pdf rule.
+# --- Local CV with contact details
+/samples/cv.pdf
 
 # --- Jupyter (if any appear)
 .ipynb_checkpoints/
