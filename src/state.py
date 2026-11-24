@@ -1,5 +1,5 @@
 from __future__ import annotations
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 from pydantic import BaseModel, Field
 
 class PipelineState(BaseModel):
@@ -7,7 +7,9 @@ class PipelineState(BaseModel):
     cv_path: str
     target_role: str
     language: str | None = None
-    provider: str | None = None
+    provider: str = "sumopod"
+    market_source: Literal["ddgs", "job-description"] = "ddgs"
+    job_description: Optional[str] = None
 
     # Intermediate
     cv_raw_text: Optional[str] = None
@@ -18,3 +20,4 @@ class PipelineState(BaseModel):
     # Output
     report_markdown: Optional[str] = None
     errors: List[str] = Field(default_factory=list)
+    warnings: List[str] = Field(default_factory=list)
