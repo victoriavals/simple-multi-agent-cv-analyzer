@@ -1,149 +1,191 @@
 from __future__ import annotations
-import io
-import os
-from pathlib import Path
-import sys
-import tempfile
-import unicodedata
-import re
-import streamlit as st
-BASE_DIR = Path(__file__).parent.resolve()
-if str(BASE_DIR) not in sys.path:
-    sys.path.insert(0, str(BASE_DIR))
 
-from src.state import PipelineState
-from src.graph.workflow import build_graph
-from src.llm_provider import normalize_provider
-from src.agents.report_agent import validate_markdown
+from collections.abc import Callable
+import logging
+from pathlib import Path
+import re
+from tempfile import TemporaryDirectory
+from threading import BoundedSemaphore
+import unicodedata
+
 from dotenv import load_dotenv
+import streamlit as st
+from streamlit.runtime.uploaded_file_manager import UploadedFile
+
+from src.agents.report_agent import validate_markdown
+from src.config import get_setting
+from src.graph.workflow import build_graph
+from src.state import PipelineState
+
+
+BASE_DIR = Path(__file__).resolve().parent
+MAX_UPLOAD_MB = 5
+LANGUAGES = {"indonesia": "Indonesia", "english": "English"}
+SOURCES = {"ddgs": "Pencarian web", "job-description": "Deskripsi lowongan"}
+STAGES = {
+    "reading": "Membaca CV",
+    "skills": "Mengidentifikasi skill",
+    "requirements": "Meninjau persyaratan posisi",
+    "report": "Menyusun laporan",
+}
+logger = logging.getLogger(__name__)
+
+
+@st.cache_resource(show_spinner=False)
+def analysis_slots() -> BoundedSemaphore:
+    return BoundedSemaphore(2)
 
 
 def slugify(value: str) -> str:
     value = unicodedata.normalize("NFKD", value).encode("ascii", "ignore").decode("ascii")
     value = re.sub(r"[^a-zA-Z0-9-]+", "-", value).strip("-")
-    value = re.sub(r"-+", "-", value)
-    return value.lower() or "report"
+    return re.sub(r"-+", "-", value).lower() or "report"
 
 
-def render_footer() -> None:
-    import streamlit as st
-    st.write("---")
-    st.markdown(
-        "made by **Naufal Firdaus** for **Krenovation Assessment Test** • Live demo: "
-        "[simple-multi-agent-cv-analyzer.streamlit.app](https://simple-multi-agent-cv-analyzer.streamlit.app/)"
+def run_analysis(
+    state: PipelineState, uploaded: UploadedFile | None, on_progress: Callable[[str], None],
+) -> PipelineState:
+    run = build_graph(on_progress=on_progress)
+    if uploaded is None:
+        return PipelineState.model_validate(run(state))
+    with TemporaryDirectory(prefix="cv-analyzer-") as directory:
+        path = Path(directory) / ("cv" + Path(uploaded.name).suffix.lower())
+        path.write_bytes(uploaded.getbuffer())
+        state.cv_path = str(path)
+        return PipelineState.model_validate(run(state))
+
+
+def show_analysis_error(errors: list[str]) -> None:
+    details = " ".join(errors).casefold()
+    if "load cv error:" in details:
+        message = "Teks CV tidak terbaca. Gunakan PDF yang teksnya bisa disalin atau TXT UTF-8."
+    elif "market intel error:" in details and "web search" in details:
+        message = "Pencarian web tidak tersedia. Tempel deskripsi lowongan untuk melanjutkan."
+    elif "sumopod" in details:
+        status = re.search(r"sumopod returned http (\d{3})", details)
+        message = "SumoPod sedang gagal memproses analisis. Coba lagi atau hubungi pengelola aplikasi."
+        if status:
+            message = f"SumoPod mengembalikan HTTP {status[1]}. Hubungi pengelola aplikasi jika masih terjadi."
+    else:
+        message = "Laporan belum bisa dibuat. Periksa masukanmu dan coba lagi."
+    st.error(message)
+
+
+def submit_analysis(state: PipelineState, uploaded: UploadedFile | None, demo: bool) -> None:
+    st.session_state.pop("analysis", None)
+    if not state.target_role:
+        st.warning("Isi posisi tujuan sebelum menganalisis.")
+        return
+    if state.market_source == "job-description" and not state.job_description:
+        st.warning("Tempel deskripsi lowongan yang ingin dibandingkan.")
+        return
+    if uploaded is None and not demo:
+        st.warning("Unggah file CV atau gunakan CV contoh.")
+        return
+    if uploaded is not None and (
+        Path(uploaded.name).suffix.lower() not in {".pdf", ".txt"}
+        or not 0 < uploaded.size <= MAX_UPLOAD_MB * 1024 * 1024
+    ):
+        st.warning("Pilih file PDF atau TXT yang berisi teks dan berukuran maksimal 5 MB.")
+        return
+    if not get_setting("API_KEY"):
+        st.error("Layanan analisis belum dikonfigurasi. Pengelola aplikasi perlu mengisi API_KEY di Streamlit Secrets.")
+        return
+
+    status_area = st.empty()
+    slots = analysis_slots()
+    if not slots.acquire(blocking=False):
+        st.warning("Layanan sedang memproses analisis lain. Coba lagi sebentar.")
+        return
+    try:
+        status = status_area.status("Menyiapkan analisis…")
+        final = run_analysis(state, uploaded, lambda stage: status.update(label=STAGES[stage]))
+    except Exception as exc:
+        logger.warning("Streamlit analysis failed (%s)", type(exc).__name__)
+        show_analysis_error([])
+        return
+    finally:
+        slots.release()
+        status_area.empty()
+
+    if final.errors or not final.report_markdown:
+        show_analysis_error(final.errors)
+        return
+    source = (final.market_requirements or {}).get("source")
+    st.session_state["analysis"] = {
+        "markdown": final.report_markdown,
+        "role": state.target_role,
+        "language": state.language,
+        "source": source,
+        "used_fallback": state.market_source == "ddgs" and source == "job_description",
+    }
+
+
+def show_report(saved: dict) -> None:
+    st.header("Hasil analisis", anchor=False)
+    st.text(f"{saved['role']} · {LANGUAGES[saved['language']]}")
+    source = "job-description" if saved["source"] == "job_description" else "ddgs"
+    st.caption(f"Sumber persyaratan · {SOURCES[source]}")
+    if saved["used_fallback"]:
+        st.warning("Pencarian web gagal. Laporan memakai deskripsi lowongan cadangan.")
+    st.download_button(
+        "Unduh laporan .md",
+        data=saved["markdown"],
+        file_name=f"laporan-{slugify(saved['role'])}-{saved['language']}.md",
+        mime="text/markdown",
+        on_click="ignore",
     )
+    report_tab, markdown_tab = st.tabs(["Laporan", "Markdown"])
+    with report_tab:
+        st.markdown(saved["markdown"])
+        if validate_markdown(saved["markdown"], saved["language"]):
+            st.info("Beberapa bagian laporan belum terisi. Periksa hasil sebelum menggunakannya.")
+    with markdown_tab:
+        st.code(saved["markdown"], language="markdown", wrap_lines=True)
 
 
-def main():
-    load_dotenv()
-    st.set_page_config(page_title="AI CV Analyzer", page_icon="📄", layout="centered")
-    st.title("AI CV Analyzer")
-    st.caption("Analyze a candidate CV against a target role and generate a concise Markdown report.")
+def main() -> None:
+    load_dotenv(BASE_DIR / ".env")
+    st.set_page_config(page_title="CV Analyzer", page_icon=str(BASE_DIR / "web/app/icon.png"), layout="centered")
+    with st.container(horizontal=True, vertical_alignment="center"):
+        st.image(str(BASE_DIR / "web/public/cv-analyzer-logo.png"), width=40)
+        st.markdown("**CV Analyzer**")
+    st.title("Seberapa cocok CV-mu dengan posisi tujuan?", anchor=False)
+    st.write("Kenali kekuatan CV, temukan skill yang dibutuhkan, dan susun langkah belajar berikutnya.")
 
-    with st.sidebar:
-        role = st.text_input("Target role", placeholder="e.g., Senior AI Engineer")
-        language = st.selectbox("Language", options=["english", "indonesia"], index=1)
-        provider_label = st.selectbox("LLM Provider", options=["Auto", "Gemini", "Mistral"], index=0)
-        uploaded = st.file_uploader("Upload CV (.pdf or .txt)", type=["pdf", "txt"], accept_multiple_files=False)
-        demo = st.checkbox("Demo mode (use sample CV if no file uploaded)")
-        run = st.button("Run analysis")
+    st.header("Siapkan analisis", anchor=False)
+    with st.form("analysis_form"):
+        uploaded = st.file_uploader("CV kandidat", type=["pdf", "txt"], max_upload_size=MAX_UPLOAD_MB)
+        demo = st.checkbox("Gunakan CV contoh bila belum mengunggah file")
+        role = st.text_input("Posisi tujuan", placeholder="Mis. Senior AI Engineer", max_chars=150).strip()
+        language = st.selectbox("Bahasa laporan", LANGUAGES, format_func=LANGUAGES.__getitem__, key="report_language")
+        source = st.selectbox("Sumber persyaratan", SOURCES, format_func=SOURCES.__getitem__, key="market_source")
+        description = st.text_area(
+            "Deskripsi lowongan",
+            key="job_description_input",
+            height=144,
+            max_chars=15000,
+            help="Wajib untuk mode Deskripsi lowongan. Bisa dipakai sebagai cadangan saat pencarian web gagal.",
+        ).strip()
+        st.caption("Teks CV dan deskripsi yang dipakai dikirim ke SumoPod. Salinan file untuk analisis dihapus setelah diproses.")
+        run = st.form_submit_button("Analisis CV", type="primary")
 
     if run:
-        # Validate API keys early for crisp UX
-        secrets = {}
-        try:
-            if hasattr(st, "secrets"):
-                secrets = dict(st.secrets)
-        except Exception:
-            secrets = {}
-        tavily_key = secrets.get("TAVILY_API_KEY") or os.getenv("TAVILY_API_KEY")
-        # In provider selection, only require keys for chosen provider
-        prov_code = normalize_provider(provider_label)
-        if not tavily_key:
-            st.error("Missing TAVILY_API_KEY. Add it to .env or Streamlit secrets.")
-            return
-        # Optional checks for other providers to improve UX
-        if prov_code == "gemini":
-            gkey = secrets.get("GEMINI_API_KEY") or os.getenv("GEMINI_API_KEY") or os.getenv("GOOGLE_API_KEY")
-            if not gkey:
-                st.error("Missing GEMINI_API_KEY (or GOOGLE_API_KEY). Add it to .env or Streamlit secrets.")
-                return
-        if prov_code == "mistral":
-            mkey = secrets.get("MISTRAL_API_KEY") or os.getenv("MISTRAL_API_KEY")
-            if not mkey:
-                st.error("Missing MISTRAL_API_KEY. Add it to .env or Streamlit secrets.")
-                return
-
-        if not role:
-            st.warning("Please enter a target role.")
-            return
-        if not uploaded and not demo:
-            st.warning("Please upload a CV file (.pdf or .txt), or enable 'Demo mode'.")
-            return
-
-        # Persist to a temp file with the correct suffix
-        tmp_path = None
-        if uploaded:
-            suffix = "." + uploaded.name.split(".")[-1].lower()
-            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as tmp:
-                tmp.write(uploaded.getvalue())
-                tmp_path = tmp.name
-        else:
-            # Use sample
-            sample_path = Path(__file__).parent / "samples" / "sample_cv.txt"
-            if not sample_path.exists():
-                st.error("Sample CV not found at samples/sample_cv.txt.")
-                return
-            tmp_path = str(sample_path)
-
-        try:
-            state = PipelineState(cv_path=tmp_path, target_role=role, language=language, provider=prov_code)
-            run_graph = build_graph()
-            with st.spinner("Running analysis..."):
-                try:
-                    final = run_graph(state)
-                except Exception as e:
-                    st.error(f"Pipeline error: {e}")
-                    return
-                if isinstance(final, dict):
-                    final = PipelineState.model_validate(final)
-        finally:
-            # Clean up temp file
-            try:
-                # Don't delete when using sample
-                if uploaded and tmp_path and os.path.exists(tmp_path):
-                    os.unlink(tmp_path)
-            except Exception:
-                pass
-
-        if final.errors:
-            st.warning("\n".join(final.errors))
-
-        if final.report_markdown:
-            # Display the report
-            st.markdown(final.report_markdown)
-            
-            # Validate markdown and show issues if any
-            try:
-                issues = validate_markdown(final.report_markdown, language)
-                if issues:
-                    st.info("📋 **Report validation notes:**\n" + "\n".join([f"• {issue}" for issue in issues]))
-            except Exception:
-                pass  # Skip validation if function not available
-            
-            # Download button with exact same content
-            fname = f"report-{slugify(role)}-{slugify(language)}.md"
-            st.download_button(
-                label="Download as .md",
-                data=final.report_markdown.encode("utf-8"),
-                file_name=fname,
-                mime="text/markdown"
-            )
-        else:
-            st.error("No report produced.")
-
-    # Footer - always shows at the bottom
-    render_footer()
+        submit_analysis(PipelineState(
+            cv_path=str(BASE_DIR / "samples/sample_cv.txt"),
+            target_role=role,
+            language=language,
+            market_source=source,
+            job_description=description,
+        ), uploaded, demo)
+    saved = st.session_state.get("analysis")
+    if saved:
+        show_report(saved)
+    else:
+        with st.expander("Lihat contoh laporan"):
+            st.markdown((BASE_DIR / "samples/sample_output.md").read_text(encoding="utf-8"))
+    st.divider()
+    st.caption("Dibuat oleh Naufal Firdaus untuk Krenovation Assessment Test")
 
 
 if __name__ == "__main__":
