@@ -1,0 +1,6 @@
+Senior AI Engineer
+
+Build and deploy Python applications that use large language models.
+Required skills: Python, SQL, LangChain, retrieval augmented generation (RAG),
+embeddings, vector databases, Docker, automated testing, and API development.
+Experience with model evaluation, monitoring, and Kubernetes is a plus.
