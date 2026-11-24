@@ -4,7 +4,8 @@ import re
 import json
 import logging
 from pydantic import BaseModel, Field
-from langchain.schema import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage
+from ..llm_provider import LLMProviderError
 
 
 class CVExperience(BaseModel):
@@ -107,6 +108,8 @@ def parse_cv_llm(text: str, llm: Any) -> Dict[str, Any]:
         model.skills_explicit = sorted(set([s.strip().lower() for s in model.skills_explicit if s and s.strip()]))
         return model.model_dump()
         
+    except LLMProviderError:
+        raise
     except Exception as e:
         logging.warning(f"LLM parsing failed: {e}, falling back to naive parsing")
         # Fallback to naive parsing
