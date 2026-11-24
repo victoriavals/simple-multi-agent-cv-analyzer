@@ -9,26 +9,41 @@ from ..agents.skill_analyst import analyze_skills
 from ..agents.market_intel import market_intelligence_agent
 from ..agents.report_agent import make_report
 
-def build_graph() -> Callable[[PipelineState], PipelineState]:
+def build_graph(
+    on_progress: Callable[[str], None] | None = None,
+) -> Callable[[PipelineState], PipelineState]:
     # llm will be constructed using the state's selected provider at runtime
     llm_holder = {"llm": None}
 
     def load_cv_node(state: PipelineState) -> PipelineState:
-        # Initialize LLM once using selected provider
-        if llm_holder["llm"] is None:
-            prov = normalize_provider(getattr(state, "provider", "auto"))
-            try:
-                llm_holder["llm"] = get_llm(provider=prov, temperature=0.2)
-            except Exception as e:
-                state.errors.append(f"LLM init error ({prov}): {e}")
-                return state
+        if on_progress is not None:
+            on_progress("reading")
+        if not state.target_role.strip():
+            state.errors.append("Please enter a target role.")
+            return state
+        if state.market_source == "job-description" and not (state.job_description or "").strip():
+            state.errors.append("Please provide a job description for this analysis mode.")
+            return state
         try:
             state.cv_raw_text = load_cv(state.cv_path)
+            if not state.cv_raw_text.strip():
+                raise ValueError("The CV contains no readable text.")
         except Exception as e:
             state.errors.append(f"Load CV error: {e}")
+            return state
+        # Initialize LLM once using selected provider
+        if llm_holder["llm"] is None:
+            try:
+                prov = normalize_provider(state.provider)
+                llm_holder["llm"] = get_llm(provider=prov, temperature=0.2)
+            except Exception as e:
+                state.errors.append(f"LLM init error: {e}")
+                return state
         return state
 
     def parse_node(state: PipelineState) -> PipelineState:
+        if state.errors:
+            return state
         if not state.cv_raw_text:
             state.errors.append("CV kosong. Gagal mem-parsing.")
             return state
@@ -45,6 +60,8 @@ def build_graph() -> Callable[[PipelineState], PipelineState]:
             state.errors.append("CV belum terstruktur.")
             return state
         try:
+            if on_progress is not None:
+                on_progress("skills")
             state.analyzed_skills = analyze_skills(state.cv_structured, llm_holder["llm"])
         except Exception as e:
             state.errors.append(f"Skill analysis error: {e}")
@@ -54,7 +71,12 @@ def build_graph() -> Callable[[PipelineState], PipelineState]:
         if state.errors:
             return state
         try:
-            state.market_requirements = market_intelligence_agent(state.target_role, llm_holder["llm"])
+            if on_progress is not None:
+                on_progress("requirements")
+            state.market_requirements = market_intelligence_agent(
+                state.target_role, llm_holder["llm"], state.job_description, state.market_source
+            )
+            state.warnings.extend(state.market_requirements.get("warnings", []))
         except Exception as e:
             state.errors.append(f"Market intel error: {e}")
         return state
@@ -66,6 +88,8 @@ def build_graph() -> Callable[[PipelineState], PipelineState]:
             state.errors.append("Data belum lengkap untuk membuat report.")
             return state
         try:
+            if on_progress is not None:
+                on_progress("report")
             state.report_markdown = make_report(
                 state.cv_structured,
                 state.analyzed_skills,
@@ -94,6 +118,13 @@ def build_graph() -> Callable[[PipelineState], PipelineState]:
     app = g.compile()
 
     def runner(state: PipelineState) -> PipelineState:
-        return app.invoke(state)
+        try:
+            return app.invoke(state)
+        finally:
+            llm = llm_holder["llm"]
+            llm_holder["llm"] = None
+            close = getattr(llm, "close", None)
+            if callable(close):
+                close()
 
     return runner
