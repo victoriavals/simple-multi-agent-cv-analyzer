@@ -1,6 +1,7 @@
 from __future__ import annotations
 from typing import Any, Dict, List
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage
+from ..llm_provider import EmptyLLMResponseError, LLMProviderError
 
 # Beberapa keyword heuristik biar tetap bisa jalan tanpa LLM
 IMPLICIT_MAP = {
@@ -82,15 +83,15 @@ def analyze_skills(cv_structured: Dict[str, Any], llm: Any) -> Dict[str, Any]:
     # LLM pass to infer additional explicit skills from narrative text
     narrative = "\n\n".join([
         str(cv_structured.get("summary", "")),
-        str(cv_structured.get("experience", "")),
+        str(cv_structured.get("experiences") or cv_structured.get("experience") or ""),
         str(cv_structured.get("projects", "")),
-        "\n".join([p.get("description", "") for p in cv_structured.get("projects", []) if isinstance(p, dict)])
+        "\n".join([p.get("description") or "" for p in cv_structured.get("projects", []) if isinstance(p, dict)])
     ]).strip()
     
     messages = [
         SystemMessage(content=(
             "Extract concrete technical skills, tools, programming languages, frameworks, and libraries from text. "
-            "Return ONLY a comma-separated list (lowercase). No prose, no explanations, no commentary."
+            "Return ONLY a comma-separated list (lowercase). If there are no additional skills, return exactly NONE."
         )),
         HumanMessage(content=(
             f"TEXT:\n{narrative}\n\nCURRENT SKILLS:\n{', '.join(explicit)}\n\n"
@@ -109,8 +110,12 @@ def analyze_skills(cv_structured: Dict[str, Any], llm: Any) -> Dict[str, Any]:
         # Filter and deduplicate
         extra = [
             skill for skill in candidates 
-            if skill not in explicit and _is_tech_skill(skill)
+            if skill != "none" and skill not in explicit and _is_tech_skill(skill)
         ]
+    except EmptyLLMResponseError:
+        pass  # The CV skills are already available when there is nothing to add.
+    except LLMProviderError:
+        raise
     except Exception:
         extra = []
 
