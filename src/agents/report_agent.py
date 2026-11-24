@@ -3,7 +3,9 @@ import json
 import re
 from typing import Any, Dict, List
 from pydantic import BaseModel, Field
-from langchain.schema import SystemMessage, HumanMessage
+from langchain_core.messages import SystemMessage, HumanMessage
+from urllib.parse import quote
+from ..llm_provider import LLMProviderError
 
 
 # -------- Data models --------
@@ -107,6 +109,8 @@ def generate_report_data(llm: Any, language: str, context: Dict[str, Any]) -> Re
     try:
         resp = llm.invoke(messages)
         content = getattr(resp, "content", "").strip()
+    except LLMProviderError:
+        raise
     except Exception as e:
         # LLM failed, fallback
         strengths = [TableItem(skill=s, notes="terkait kebutuhan pasar") for s in context.get("diff", {}).get("strengths", [])][:5]
@@ -166,6 +170,18 @@ def postprocess_markdown(md: str, language: str) -> str:
     return s.rstrip() + "\n"
 
 
+def _render_week_plan(weeks: List[WeekPlan], label: str) -> List[str]:
+    lines: List[str] = []
+    for index, week in enumerate(weeks, 1):
+        title = re.sub(r"^(?:week|minggu)\s+\d+\b\s*[:—–.-]*\s*", "", week.title.strip(), flags=re.I)
+        heading = f"### {label} {index}"
+        if title:
+            heading += f" — {title}"
+        lines.extend(["", heading, ""])
+        lines.extend(f"- {task}" for task in week.tasks or ["-"])
+    return lines
+
+
 def render_markdown_id(report: ReportData) -> str:
     lines: List[str] = []
     lines += ["## Ikhtisar", report.overview.strip() or "-"]
@@ -182,11 +198,7 @@ def render_markdown_id(report: ReportData) -> str:
     else:
         lines.append("| - | Belum teridentifikasi |")
     lines += ["", "## Rencana Upskilling"]
-    for i, wk in enumerate(report.plan_weeks, 1):
-        title = wk.title.strip() or f"Minggu {i}"
-        lines.append(f"**Minggu {i} — {title}**")
-        for t in wk.tasks or ["-"]:
-            lines.append(f"- {t}")
+    lines.extend(_render_week_plan(report.plan_weeks, "Minggu"))
     lines += ["", "## Catatan Akhir", report.final_notes.strip() or "-"]
     md = "\n".join(lines)
     return postprocess_markdown(md, "indonesia")
@@ -208,11 +220,7 @@ def render_markdown_en(report: ReportData) -> str:
     else:
         lines.append("| - | Not identified yet |")
     lines += ["", "## Actionable Upskilling Plan"]
-    for i, wk in enumerate(report.plan_weeks, 1):
-        title = wk.title.strip() or f"Week {i}"
-        lines.append(f"**Week {i} — {title}**")
-        for t in wk.tasks or ["-"]:
-            lines.append(f"- {t}")
+    lines.extend(_render_week_plan(report.plan_weeks, "Week"))
     lines += ["", "## Final Notes", report.final_notes.strip() or "-"]
     md = "\n".join(lines)
     return postprocess_markdown(md, "english")
@@ -254,7 +262,7 @@ def make_report(cv_structured: Dict[str, Any],
     market_sk = market.get("skills", [])
     diff = _diff_lists(explicit + implicit, market_sk)
     context = {
-        "summary": cv_structured.get("summary", "")[:800],
+        "summary": (cv_structured.get("summary") or "")[:800],
         "explicit": explicit,
         "implicit": implicit,
         "market": market_sk,
@@ -263,6 +271,15 @@ def make_report(cv_structured: Dict[str, Any],
         "source": market.get("source", "")
     }
     rd = generate_report_data(llm, language, context)
-    if (language or "").lower().startswith("indo"):
-        return render_markdown_id(rd)
-    return render_markdown_en(rd)
+    is_id = (language or "").lower().startswith("indo")
+    md = render_markdown_id(rd) if is_id else render_markdown_en(rd)
+    if market.get("source") == "job_description":
+        note = "Basis kebutuhan skill: deskripsi lowongan yang diberikan pengguna." if is_id else "Skill requirements are based on the user-supplied job description."
+        md += "\n" + note + "\n"
+    elif market.get("source") == "ddgs":
+        md += "\n" + ("Sumber kebutuhan skill:" if is_id else "Sources for skill requirements:") + "\n"
+        for source in market.get("sources", []):
+            title = source["title"].replace("[", "\\[").replace("]", "\\]").replace("\n", " ")
+            url = quote(source["url"], safe=":/?&=%#@+;,-._~")
+            md += f"- [{title or 'Source'}]({url})\n"
+    return md
